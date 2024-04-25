@@ -1,16 +1,47 @@
-﻿namespace TimeEdit.Unofficial
+﻿#if INTERACTIVE
+#r "nuget: FSharp.Data"
+#r "nuget: Jint"
+#else
+namespace TimeEdit.Unofficial
+#endif
 
-open FSharp.Data;
+open System.IO
+open System.Reflection
+open System.Text.RegularExpressions
+open FSharp.Data
+open Jint
+
 
 module TimeEdit =
     let private BASE_URL = "https://cloud.timeedit.net/lu/web/lth1/";
-    
-    let queryProgram name =
-        let queryUrl = $"%s{BASE_URL}objects.html?partajax=t&sid=1002&search_text=%s{name}&types=191"
+       
+    let queryProgram programName =
+        let queryUrl = $"%s{BASE_URL}objects.html?partajax=t&sid=1002&search_text=%s{programName}&types=191"
+        let document = HtmlDocument.Load(queryUrl)
+        document.Elements() |> Seq.filter (fun elem -> elem.AttributeValue("data-name") = programName) |> Seq.map (_.AttributeValue("data-idonly"))
         
-        let queryPage = HtmlDocument.Load(queryUrl)
-        let programObj = queryPage.Elements() |> Seq.filter (fun elem -> elem.AttributeValue("data-name") = name) |> Seq.head
+    let getLinkbase () =
+        let document = HtmlDocument.Load("https://cloud.timeedit.net/lu/web/lth1/ri1Q5006.html")
+        document.Descendants() |> Seq.filter (_.HasId("links_base")) |> Seq.head |> (_.AttributeValue("data-base"))
+       
+    let documentStubJs () =
+        let assembly = Assembly.GetExecutingAssembly()
         
-        programObj.AttributeValue("data-idonly")
+        #if INTERACTIVE
+        use reader = new StreamReader("./TimeEdit.Unofficial/stub.js")
+        #else
+        use stream = assembly.GetManifestResourceStream("stub.js")
+        use reader = new StreamReader(stream)
+        #endif
+        reader.ReadToEnd()
         
+    let interpretScrambler () =
+        let document = HtmlDocument.Load("https://cloud.timeedit.net/lu/web/lth1/ri1Q5006.html")
+        let initJs = document.Descendants["script"] |> Seq.map (_.InnerText()) |> Seq.head
+        let mainJsPath = Regex.Match(initJs, "'\/static\/.+?\/min.js'").Value.Replace("'", "")
+        let mainJsUrl = $"https://cloud.timeedit.net%s{mainJsPath}"
         
+        let mainJs = Http.RequestString(mainJsUrl)
+                
+        let engine = new Engine() |> (_.Execute(documentStubJs())) |> (_.Execute(mainJs)) 
+        engine.Dispose()
