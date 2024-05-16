@@ -13,10 +13,14 @@ open Jint
 
 module TimeEdit =
     let private BASE_URL = "https://cloud.timeedit.net/lu/web/lth1/";
+    
+    type public Document(window) =
+        member public this.defaultView = window
        
     type public Window() =
         member public this.createElement(test: string) = printf $"%s{test}"
-        member val document = ""
+        member public this.document = Document(this)
+        member public this.window = this
             
     let queryProgram programName =
         let queryUrl = $"%s{BASE_URL}objects.html?partajax=t&sid=1002&search_text=%s{programName}&types=191"
