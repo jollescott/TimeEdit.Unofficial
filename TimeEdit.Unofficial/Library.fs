@@ -11,10 +11,13 @@ open System.Text.RegularExpressions
 open FSharp.Data
 open Jint
 
-
 module TimeEdit =
     let private BASE_URL = "https://cloud.timeedit.net/lu/web/lth1/";
        
+    type public Window() =
+        member public this.createElement(test: string) = printf $"%s{test}"
+        member val document = ""
+            
     let queryProgram programName =
         let queryUrl = $"%s{BASE_URL}objects.html?partajax=t&sid=1002&search_text=%s{programName}&types=191"
         let document = HtmlDocument.Load(queryUrl)
@@ -43,5 +46,9 @@ module TimeEdit =
         
         let mainJs = Http.RequestString(mainJsUrl)
                 
-        let engine = new Engine() |> (_.Execute(documentStubJs())) |> (_.Execute(mainJs)) 
+        let window = Window()
+        
+        let wrapperCodeJs = $"function wrapper() {{ %s{mainJs} }};"
+        
+        let engine = new Engine() |> _.SetValue("window", window) |> _.Execute(wrapperCodeJs) |> _.Execute("wrapper.call(window);")
         engine.Dispose()
